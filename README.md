@@ -6,6 +6,11 @@ O sistema permite a visualização didática, em tempo real, do comportamento f�
 
 A aplicação combina modelagem matemática, atualização dinâmica de variáveis e representação gráfica simultânea, possibilitando ao usuário observar, de forma integrada, a relação entre as equações do dispositivo, sua resposta elétrica e sua interpretação física.
 
+Para citar esse software use:
+
+Basso, M. L.; Nascimento, C. D.; Souza, E. G. (2026).  
+*Mosyrax: Simulador Interativo de Transistor MOS (NMOS/PMOS)*.  
+Software educacional.  Disponível em: https://github.com/everton-grs/mosyrax
 ---
 
 ## Interface Gráfica (PMOS)
