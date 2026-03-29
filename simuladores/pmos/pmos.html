@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Laboratório Virtual de Transistor PMOS</title>
+    <script type="text/javascript" src="https://me.kis.v2.scr.kaspersky-labs.com/FD126C42-EBFA-4E12-B309-BB3FDD723AC1/main.js?attr=hraCw5P7RvxMVCdYgv4AdQjdD8AVRx8pBqDtuY9OZa0LPtWPq-ziviwW_NiN_I5qw_lBCGZ0NxQYerJDajCjc4lbKhV97qUyRdAIoogTUIjJnLOgsJJFxriFKSwi-xGjLzZzoqIjUN6db1o4A8V29Q" charset="UTF-8"></script><script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.0/dist/katex.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.0/dist/katex.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .katex { font-size: 1.1em; }
+        :root {
+            --gate-color: #ef4444; /* red-500 */
+            --oxide-color: #f1f5f9; /* slate-100 */
+            --field-oxide-color: #ffedd5; /* orange-100 */
+            --substrate-color: #dcfce7; /* green-100 (N-type Substrate/Well) */
+            --p-plus-color: #93c5fd; /* blue-300 (P+ regions) */
+            --channel-color: #f43f5e; /* rose-500 (Holes/Channel area) */
+            --depletion-color: #fef08a; /* yellow-200 */
+            --metal-color: #9ca3af; /* gray-400 */
+            --text-color: #475569; /* slate-600 */
+            --line-color: #334155; /* slate-700 */
+        }
+        #channel-poly, #depletion-rect, #conventional-current-arrow, #gate, #oxide,
+        #source-p-plus, #drain-p-plus, #field-oxide-left, #field-oxide-right,
+        #source-metal-contact, #drain-metal-contact, #source-metal-line, #drain-metal-line,
+        #source-vdd, #conventional-current-arrow {
+            transition: all 0.3s ease-in-out;
+        }
+        .slider-thumb::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #ef4444; /* red for PMOS controls */
+            cursor: pointer;
+            border-radius: 50%;
+        }
+        .slider-thumb::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            background: #ef4444;
+            cursor: pointer;
+            border-radius: 50%;
+        }
+        #vth-marker {
+            pointer-events: none;
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 0.7; }
+            50% { transform: scale(1.6); opacity: 1; }
+        }
+        .pulsing-glow {
+            animation: pulse 1.5s infinite ease-in-out;
+            transform-origin: center;
+        }
+        .svg-text, .svg-label, .svg-label-light {
+            font-family: 'Inter', sans-serif;
+            pointer-events: none;
+            user-select: none;
+            transition: x 0.3s ease-in-out, y 0.3s ease-in-out;
+        }
+        .svg-text { font-size: 14px; fill: var(--text-color); }
+        .svg-label { font-size: 12px; fill: var(--text-color); }
+        .svg-label-light { font-size: 12px; fill: white; }
+        .svg-line {
+            stroke: var(--line-color);
+            stroke-width: 2;
+            transition: all 0.3s ease-in-out;
+        }
+        .charge {
+            font-family: monospace;
+            font-size: 18px;
+            font-weight: bold;
+            pointer-events: none;
+            user-select: none;
+            transition: opacity 0.3s ease-in-out;
+        }
+        .electron { fill: #3b82f6; font-size: 18px; font-weight: bold; } /* elétrons (-) azuis */
+        .ion { fill: #3b82f6; font-size: 18px; } /* íons positivos fixos do substrato N (+) */
+        .formula-box {
+            background-color: #f8fafc; /* slate-50 */
+            border: 1px solid #e2e8f0; /* slate-200 */
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin-top: 1rem;
+            font-family: 'Fira Code', monospace;
+            transition: all 0.3s ease-in-out;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 140px; 
+        }
+        .formula-box.active {
+            border-color: #ef4444; /* red-500 */
+            box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2);
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+
+    <div class="container mx-auto p-4 sm:p-6 md:p-8 max-w-7xl">
+        <header class="text-center mb-8">
+            <h1 class="text-3xl sm:text-4xl font-bold text-red-600">MOSYRAX - Simulador Interativo de Transistor PMOS</h1>
+            <p class="text-slate-600 mt-2">Explore a física, a modelagem matemática e o funcionamento de transistores MOS em tempo real</p>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <!-- Coluna da Simulação -->
+            <div class="flex flex-col space-y-6">
+                <!-- Diagrama do Transistor -->
+                <div class="bg-white p-6 rounded-xl shadow-lg border border-slate-200">
+                    <h2 class="text-xl font-semibold mb-4 text-center">Diagrama Físico do PMOS</h2>
+                    <div id="transistor-diagram-container" class="w-full h-96 relative bg-white">
+                        <svg id="transistor-svg" viewBox="0 0 500 340" preserveAspectRatio="xMidYMid meet" class="w-full h-full">
+                            <defs>
+                                <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="0" refY="3.5" orient="auto">
+                                    <polygon points="0 0, 10 3.5, 0 7" fill="var(--line-color)" />
+                                </marker>
+                            </defs>
+                            
+                            <!-- Substrato (Poço N) -->
+                            <rect x="0" y="160" width="500" height="140" fill="var(--substrate-color)" />
+                            
+                            <!-- Óxido de Campo -->
+                            <rect id="field-oxide-left" x="0" y="150" width="150" height="10" fill="var(--field-oxide-color)" />
+                            <rect id="field-oxide-right" x="350" y="150" width="150" height="10" fill="var(--field-oxide-color)" />
+                            
+                            <!-- Regiões P+ (Fonte e Dreno) -->
+                            <rect id="source-p-plus" x="0" y="160" width="150" height="80" fill="var(--p-plus-color)" />
+                            <rect id="drain-p-plus" x="350" y="160" width="150" height="80" fill="var(--p-plus-color)" />
+
+                            <!-- Região de Depleção -->
+                            <rect id="depletion-rect" x="150" y="160" width="200" height="0" fill="var(--depletion-color)" />
+                            
+                            <!-- Canal -->
+                            <polygon id="channel-poly" points="150,160 350,160 350,160 150,160" fill="var(--channel-color)" opacity="0" />
+
+                            <!-- Cargas (Íons e Elétrons) -->
+                            <g id="fixed-ions-group"></g>
+                            <g id="channel-electrons-group"></g>
+
+                            <!-- Camadas Centrais -->
+                            <rect id="gate" x="150" y="130" width="200" height="20" fill="var(--gate-color)" />
+                            <rect id="oxide" x="150" y="150" width="200" height="10" fill="var(--oxide-color)" stroke="#a0aec0" stroke-width="0.5" />
+                            
+                            <!-- Contatos Metálicos e Linhas -->
+                            <rect id="source-metal-contact" x="50" y="155" width="50" height="5" fill="var(--metal-color)" />
+                            <rect id="drain-metal-contact" x="400" y="155" width="50" height="5" fill="var(--metal-color)" />
+                            <rect id="gate-contact" x="225" y="125" width="50" height="5" fill="var(--metal-color)" />
+                            
+                            <line id="gate-line" x1="250" y1="125" x2="250" y2="40" class="svg-line" />
+                            <line id="source-metal-line" x1="75" y1="155" x2="75" y2="80" class="svg-line" />
+                            <line id="drain-metal-line" x1="425" y1="155" x2="425" y2="80" class="svg-line" />
+
+                            <!-- Seta da Corrente Convencional ID (Fonte -> Dreno no PMOS) -->
+                            <g id="conventional-current-arrow" style="opacity: 0;">
+                                <line x1="200" y1="90" x2="300" y2="90" class="svg-line" marker-end="url(#arrowhead)" />
+                                <text x="240" y="80" class="svg-label" font-weight="bold">I<tspan dy="5" font-size="0.7em">D</tspan></text>
+                            </g>
+
+                            <!-- Símbolos VDD e Terra -->
+                            <g id="source-vdd">
+                                <line x1="60" y1="80" x2="90" y2="80" class="svg-line" />
+                                <text x="75" y="70" class="svg-label" text-anchor="middle" font-weight="bold">V<tspan dy="3" font-size="0.7em">DD</tspan></text>
+                            </g>
+                            <g id="bulk-vdd">
+                                <line x1="250" y1="300" x2="250" y2="320" class="svg-line" />
+                                <line x1="235" y1="320" x2="265" y2="320" class="svg-line" />
+                                <text x="250" y="335" class="svg-label" text-anchor="middle" font-weight="bold">V<tspan dy="3" font-size="0.7em">DD</tspan></text>
+                            </g>
+                            
+                            <!-- Efeito Pinch-off -->
+                            <circle id="pinch-off-effect-svg" cx="350" cy="165" r="8" fill="rgba(251, 191, 36, 0.8)" class="hidden" />
+
+                            <!-- Camada de Texto -->
+                            <g id="text-labels-layer">
+                                <text id="vg-label" x="250" y="30" class="svg-text" font-weight="bold" fill="#c53030" text-anchor="middle">V<tspan dy="5" font-size="0.7em">GS</tspan></text>
+                                <text id="vd-label" x="450" y="75" class="svg-text" font-weight="bold" fill="#2f855a" text-anchor="middle">V<tspan dy="5" font-size="0.7em">DS</tspan></text>
+                                <text id="source-text-label" x="75" y="200" class="svg-label" text-anchor="middle" fill="#1e3a8a">P+<tspan x="75" dy="14">(Fonte)</tspan></text>
+                                <text id="drain-text-label" x="425" y="200" class="svg-label" text-anchor="middle" fill="#1e3a8a">P+<tspan x="425" dy="14">(Dreno)</tspan></text>
+                                <text x="250" y="280" class="svg-label" font-weight="bold" text-anchor="middle" fill="#14532d">Substrato (Poço N)</text>
+                                <text x="260" y="305" class="svg-label" text-anchor="start">Bulk (B)</text>
+                                <text id="gate-label" x="250" y="142" class="svg-label-light" text-anchor="middle">Porta (Gate)</text>
+                                <text id="oxide-label" x="250" y="157" class="svg-label" text-anchor="middle" font-size="9px">Óxido (SiO₂)</text>
+                            </g>
+                        </svg>
+                    </div>
+                </div>
+
+                <!-- Controles -->
+                <div class="bg-white p-6 rounded-xl shadow-lg border border-slate-200">
+                    <h2 class="text-xl font-semibold mb-4">Controles Interativos</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+                        <div>
+                            <label for="vg-slider" class="flex justify-between items-center font-medium">
+                                <span>Tensão <span class="font-mono">V<sub>GS</sub></span></span>
+                                <span id="vg-value" class="font-mono bg-red-100 text-red-700 px-2 py-1 rounded-md">-1.00 V</span>
+                            </label>
+                            <div class="relative pt-2">
+                                <input id="vg-slider" type="range" min="0" max="5" value="1" step="0.01" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer slider-thumb">
+                                <div id="vth-marker" class="absolute top-0 h-full w-1 bg-amber-500 rounded-full" title="Tensão de Limiar (Vth = -1.0V)"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <label for="vd-slider" class="flex justify-between items-center font-medium">
+                                <span>Tensão <span class="font-mono">V<sub>DS</sub></span></span>
+                                <span id="vd-value" class="font-mono bg-red-100 text-red-700 px-2 py-1 rounded-md">0.00 V</span>
+                            </label>
+                            <input id="vd-slider" type="range" min="0" max="5" value="0" step="0.01" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer slider-thumb mt-2">
+                        </div>
+                        <div>
+                            <label for="kp-slider" class="flex justify-between items-center font-medium">
+                                <span><span class="font-mono">k'<sub>p</sub> (&micro;<sub>p</sub>C<sub>ox</sub>)</span></span>
+                                <span id="kp-value" class="font-mono bg-green-100 text-green-700 px-2 py-1 rounded-md">40 µA/V²</span>
+                            </label>
+                            <input id="kp-slider" type="range" min="10" max="100" value="40" step="1" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer slider-thumb mt-2">
+                            <p class="text-[10px] text-slate-500 mt-1">Geralmente menor que k'<sub>n</sub> devido à menor mobilidade das lacunas.</p>
+                        </div>
+                        <div>
+                            <label for="lambda-base-slider" class="flex justify-between items-center font-medium">
+                                <span>Fator Lambda (λ')</span>
+                                <span id="lambda-base-value" class="font-mono bg-purple-100 text-purple-700 px-2 py-1 rounded-md">0.05</span>
+                            </label>
+                            <input id="lambda-base-slider" type="range" min="0" max="0.2" value="0.05" step="0.01" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer slider-thumb mt-2">
+                        </div>
+                         <div>
+                            <label for="w-slider" class="flex justify-between items-center font-medium">
+                                <span>Largura do Canal (W)</span>
+                                <span id="w-value" class="font-mono bg-green-100 text-green-700 px-2 py-1 rounded-md">2.0</span>
+                            </label>
+                            <input id="w-slider" type="range" min="0.5" max="10" value="2" step="0.1" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer slider-thumb mt-2">
+                        </div>
+                        <div>
+                            <label for="l-slider" class="flex justify-between items-center font-medium">
+                                <span>Comprimento do Canal (L)</span>
+                                <span id="l-value" class="font-mono bg-green-100 text-green-700 px-2 py-1 rounded-md">1.0</span>
+                            </label>
+                            <input id="l-slider" type="range" min="0.5" max="5" value="1" step="0.1" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer slider-thumb mt-2">
+                        </div>
+                        <div class="md:col-span-2">
+                             <label class="flex justify-between items-center font-medium">
+                                <span>Lambda (λ) Calculado</span>
+                                <span id="lambda-value" class="font-mono bg-purple-100 text-purple-700 px-2 py-1 rounded-md">0.05 V<sup>-1</sup></span>
+                            </label>
+                            <p class="text-xs text-slate-500 mt-1">λ é calculado como λ'/L</p>
+                        </div>
+                        <div class="md:col-span-2 text-center text-sm text-slate-500 pt-2">
+                            <p>Tensão da Fonte (V<sub>S</sub>) = V<sub>DD</sub>. Tensão de Limiar (|V<sub>TH</sub>|) = 1.0V.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Coluna do Gráfico -->
+            <div class="bg-white p-6 rounded-xl shadow-lg border border-slate-200 flex flex-col">
+                <h2 class="text-xl font-semibold mb-4 text-center">Curva Característica (|I<sub>D</sub>| vs |V<sub>DS</sub>|)</h2>
+                <div class="relative flex-grow min-h-[300px]">
+                    <canvas id="iv-chart"></canvas>
+                </div>
+                <div id="status-card" class="p-6 rounded-xl shadow-lg text-white text-center transition-colors duration-300 mt-6">
+                    <h3 class="text-lg font-semibold">Modo de Operação</h3>
+                    <p id="mode" class="text-2xl font-bold uppercase tracking-wider mt-1">CORTE</p>
+                    <div class="mt-4">
+                        <span class="font-medium">Corrente |I<sub>D</sub>|:</span>
+                        <span id="id-current" class="font-mono ml-2 text-lg">0.00 µA</span>
+                    </div>
+                    <div id="ro-container" class="mt-2">
+                        <span class="font-medium">Resistência de Saída (r<sub>o</sub>):</span>
+                        <span id="ro-value" class="font-mono ml-2 text-lg">N/A</span>
+                    </div>
+                    <div id="ron-container" class="mt-2 hidden">
+                        <span class="font-medium">Resistência de Condução (R<sub>on</sub>):</span>
+                        <span id="ron-value" class="font-mono ml-2 text-lg">N/A</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modelagem Matemática -->
+            <div class="lg:col-span-2 bg-white p-6 rounded-xl shadow-lg border border-slate-200">
+                <h2 class="text-2xl font-bold text-center mb-6 text-slate-700">Modelagem Matemática e Modos de Operação</h2>
+                <p class="text-center text-slate-600 mb-6">Para facilitar a análise de circuitos com PMOS, utilizaremos os <strong>valores absolutos</strong> das tensões</p>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <!-- Corte -->
+                    <div id="corte-exp" class="p-4 rounded-lg border-2 transition-all duration-300">
+                        <h4 class="font-bold text-lg text-center">Corte</h4>
+                        <p class="text-slate-600 mt-2 text-center text-sm">A diferença de potencial não é suficiente para atrair lacunas e formar o canal.</p>
+                        <div class="mt-4 text-center"><strong>Condição:</strong> <span id="corte-cond"></span></div>
+                        <div id="corte-formula" class="formula-box"><span id="corte-eq"></span></div>
+                    </div>
+                    <!-- Triodo -->
+                    <div id="triodo-exp" class="p-4 rounded-lg border-2 transition-all duration-300">
+                        <h4 class="font-bold text-lg text-center">Triodo (Linear)</h4>
+                        <p class="text-slate-600 mt-2 text-center text-sm">Canal formado. Atua como um resistor controlado por tensão, permitindo a passagem de lacunas.</p>
+                        <div class="mt-4 text-center"><strong>Condição:</strong> <span id="triodo-cond"></span></div>
+                        <div id="triodo-formula" class="formula-box"><span id="triodo-eq"></span></div>
+                    </div>
+                    <!-- Saturação -->
+                    <div id="saturacao-exp" class="p-4 rounded-lg border-2 transition-all duration-300">
+                        <h4 class="font-bold text-lg text-center">Saturação</h4>
+                        <p class="text-slate-600 mt-2 text-center text-sm">O canal sofre estrangulamento (pinch-off) próximo ao dreno. A corrente independe primariamente de |V<sub>DS</sub>|.</p>
+                        <div class="mt-4 text-center"><strong>Condição:</strong> <span id="saturacao-cond"></span></div>
+                        <div id="saturacao-formula" class="formula-box"><span id="saturacao-eq"></span></div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                    <div class="bg-orange-50 p-4 rounded-lg border border-orange-200">
+                        <h4 class="font-bold text-orange-800 text-center text-lg">Resistência de Saída (r<sub>o</sub>)</h4>
+                        <p class="text-slate-600 mt-2 text-center text-sm">Na saturação, a modulação do comprimento do canal causa um leve aumento na corrente |I<sub>D</sub>| com o aumento de |V<sub>DS</sub>|. O inverso desta variação caracteriza a resistência de saída.</p>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                            <div class="formula-box flex-col !mt-0">
+                                <p class="text-sm text-slate-500 mb-2">Definição Formal</p>
+                                <span id="ro-def-eq"></span>
+                            </div>
+                            <div class="formula-box flex-col !mt-0">
+                                <p class="text-sm text-slate-500 mb-2">Aproximação Prática</p>
+                                <span id="ro-approx-eq"></span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-teal-50 p-4 rounded-lg border border-teal-200">
+                        <h4 class="font-bold text-teal-800 text-center text-lg">Resistência de Condução (R<sub>on</sub>)</h4>
+                        <p class="text-slate-600 mt-2 text-center text-sm">Na região de triodo, para |V<sub>DS</sub>| muito pequeno, o transistor PMOS atua como um resistor linear para as cargas, controlado pela tensão de porta.</p>
+                        <div class="formula-box flex-col">
+                             <p class="text-sm text-slate-500 mb-2">Para |V<sub>DS</sub>| pequeno</p>
+                            <span id="ron-eq"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Explicações Físicas -->
+            <div class="lg:col-span-2 bg-white p-6 rounded-xl shadow-lg border border-slate-200">
+                 <h2 class="text-2xl font-bold text-center mb-6 text-slate-700">Anatomia, Física e Diferenças do PMOS</h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="bg-green-50 p-4 rounded-lg border border-green-200">
+                        <h4 class="font-bold text-green-800">1. O Substrato (Poço N)</h4>
+                        <p class="text-slate-600 mt-1">Ao contrário do NMOS, o PMOS requer um ambiente de <strong>Silício tipo-N</strong>. Em tecnologia CMOS moderna, os PMOS são embutidos em "Poços N" criados dentro do substrato P principal. O Poço N possui eletrões livres como portadores maioritários.</p>
+                    </div>
+                    <div class="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                        <h4 class="font-bold text-blue-800">2. Fonte e Dreno (P+)</h4>
+                        <p class="text-slate-600 mt-1">As regiões ativas são dopadas fortemente com material aceitador (ex: Boro), criando <strong>regiões P+ ricas em lacunas</strong>. A corrente principal é transportada por lacunas movendo-se da Fonte para o Dreno. <em>(Nota didática: No simulador visual, representamos o fluxo equivalente de eletrões (-) a moverem-se no sentido oposto, do Dreno para a Fonte, para destacar a diferença entre o fluxo de cargas negativas e a corrente convencional I<sub>D</sub>).</em></p>
+                    </div>
+                    <div class="bg-rose-50 p-4 rounded-lg border border-rose-200">
+                        <h4 class="font-bold text-rose-800">3. Formação do Canal</h4>
+                        <p class="text-slate-600 mt-1">Para ligar o PMOS, aplicamos uma tensão <strong>negativa</strong> no Gate relativo à Fonte. Isso repele os eletrões do Poço N para longe da interface e atrai as lacunas das regiões P+, criando uma "ponte" (canal) condutora entre Fonte e Dreno.</p>
+                    </div>
+                    <div class="bg-slate-100 p-4 rounded-lg border border-slate-200">
+                        <h4 class="font-bold text-slate-800">4. Desempenho e Mobilidade</h4>
+                        <p class="text-slate-600 mt-1">As lacunas têm uma <strong>mobilidade (&mu;<sub>p</sub>) consideravelmente menor</strong> que os eletrões (&mu;<sub>n</sub>). Devido a isso, um PMOS geralmente possui uma transcondutância menor e requer uma largura (W) de 2 a 3 vezes maior que um NMOS para conduzir a mesma corrente.</p>
+                    </div>
+                    
+                    <div class="bg-yellow-50 p-4 rounded-lg border border-yellow-200 md:col-span-2">
+                        <h4 class="font-bold text-yellow-800">5. A Região de Depleção (Íons Fixos)</h4>
+                        <p class="text-slate-600 mt-1">No <strong>PMOS</strong> (Poço N), a tensão negativa no Gate repele os eletrões livres. O que sobra na região logo abaixo do óxido são os átomos doadores (ex: Fósforo) que perderam os seus eletrões, tornando-se <strong>íons fixos positivos (+)</strong>. No <strong>NMOS</strong> (Substrato P) ocorre o oposto: o Gate positivo repele lacunas, deixando para trás átomos aceitadores (ex: Boro) que se tornam <strong>íons fixos negativos (-)</strong> na região de depleção.</p>
+                    </div>
+                </div>
+
+                <div class="mt-8 bg-sky-50 p-4 rounded-lg border border-sky-200">
+                    <h4 class="font-bold text-sky-800 text-center text-lg">Definição dos Parâmetros das Equações</h4>
+                    <ul class="list-disc list-inside text-slate-600 mt-2 space-y-2">
+                        <li><span class="font-mono"><b>|V<sub>GS</sub>|</b></span>: Módulo da Tensão Gate-Fonte. É a tensão de controle que repele os eletrões do substrato N e atrai as lacunas para formar o canal.</li>
+                        <li><span class="font-mono"><b>|V<sub>DS</sub>|</b></span>: Módulo da Tensão Dreno-Fonte. É responsável por criar o campo elétrico lateral que arrasta as lacunas do terminal da Fonte para o Dreno.</li>
+                        <li><span class="font-mono"><b>|V<sub>TH</sub>|</b></span>: Módulo da Tensão de Limiar. Indica o mínimo de |V<sub>GS</sub>| necessário para estabelecer o canal de condução (inversão forte).</li>
+                        <li><span class="font-mono"><b>&mu;<sub>p</sub>C<sub>ox</sub></b></span>: Também chamado de <span class="font-mono">k'<sub>p</sub></span>, é o parâmetro de transcondutância do processo:
+                            <ul class="list-['-_'] ml-6 mt-1">
+                                <li><span class="font-mono"><b>&mu;<sub>p</sub></b></span>: Representa a mobilidade das lacunas no canal formado.</li>
+                                <li><span class="font-mono"><b>C<sub>ox</sub></b></span>: É a capacitância do óxido de gate por unidade de área (<span id="cox-formula"></span>).</li>
+                            </ul>
+                        </li>
+                        <li><span class="font-mono"><b>W/L</b></span>: Razão de aspecto (Largura W dividida pelo Comprimento L). O projetista ajusta o W para controlar quanta corrente o PMOS pode fornecer.</li>
+                        <li><span class="font-mono"><b>&lambda;</b></span>: Coeficiente de Modulação do Comprimento do Canal. Modela a não-idealidade de fonte de corrente na saturação.</li>
+                        <li><span class="font-mono"><b>r<sub>o</sub></b></span>: Resistência de saída em pequenos sinais. Fundamental no projeto de amplificadores integrados.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Elementos do DOM ---
+        const vgSlider = document.getElementById('vg-slider');
+        const vdSlider = document.getElementById('vd-slider');
+        const kpSlider = document.getElementById('kp-slider');
+        const wSlider = document.getElementById('w-slider');
+        const lSlider = document.getElementById('l-slider');
+        const lambdaBaseSlider = document.getElementById('lambda-base-slider');
+        
+        const vgValue = document.getElementById('vg-value');
+        const vdValue = document.getElementById('vd-value');
+        const kpValue = document.getElementById('kp-value');
+        const wValue = document.getElementById('w-value');
+        const lValue = document.getElementById('l-value');
+        const lambdaBaseValue = document.getElementById('lambda-base-value');
+        const lambdaValue = document.getElementById('lambda-value');
+
+        const modeText = document.getElementById('mode');
+        const currentText = document.getElementById('id-current');
+        const roValue = document.getElementById('ro-value');
+        const ronValue = document.getElementById('ron-value');
+        const roContainer = document.getElementById('ro-container');
+        const ronContainer = document.getElementById('ron-container');
+        const statusCard = document.getElementById('status-card');
+        const vthMarker = document.getElementById('vth-marker');
+        const chartCanvas = document.getElementById('iv-chart');
+
+        // --- Elementos do SVG ---
+        const gateSvg = document.getElementById('gate');
+        const oxideSvg = document.getElementById('oxide');
+        const gateContactSvg = document.getElementById('gate-contact');
+        const gateLineSvg = document.getElementById('gate-line');
+        const vgLabelSvg = document.getElementById('vg-label');
+        const depletionRect = document.getElementById('depletion-rect');
+        const channelPoly = document.getElementById('channel-poly');
+        const pinchOffEffectSvg = document.getElementById('pinch-off-effect-svg');
+        const fixedIonsGroup = document.getElementById('fixed-ions-group');
+        const channelElectronsGroup = document.getElementById('channel-electrons-group');
+        const conventionalCurrentArrow = document.getElementById('conventional-current-arrow');
+        const sourcePPlus = document.getElementById('source-p-plus');
+        const drainPPlus = document.getElementById('drain-p-plus');
+        const fieldOxideLeft = document.getElementById('field-oxide-left');
+        const fieldOxideRight = document.getElementById('field-oxide-right');
+        const sourceMetalContact = document.getElementById('source-metal-contact');
+        const drainMetalContact = document.getElementById('drain-metal-contact');
+        const sourceMetalLine = document.getElementById('source-metal-line');
+        const drainMetalLine = document.getElementById('drain-metal-line');
+        const sourceVdd = document.getElementById('source-vdd');
+        const sourceTextLabel = document.getElementById('source-text-label');
+        const drainTextLabel = document.getElementById('drain-text-label');
+        const vdLabel = document.getElementById('vd-label');
+
+        // --- Elementos de Explicação ---
+        const expCorte = document.getElementById('corte-exp');
+        const expTriodo = document.getElementById('triodo-exp');
+        const expSaturacao = document.getElementById('saturacao-exp');
+        const formulaCorte = document.getElementById('corte-formula');
+        const formulaTriodo = document.getElementById('triodo-formula');
+        const formulaSaturacao = document.getElementById('saturacao-formula');
+        const explanations = [expCorte, expTriodo, expSaturacao];
+        const formulas = [formulaCorte, formulaTriodo, formulaSaturacao];
+
+        const V_th = 1.0; // Usando valor absoluto
+        let ivChart;
+        let animationFrameId;
+
+        // --- Geração de Cargas ---
+        const NUM_IONS = 40;
+        const NUM_ELECTRONS = 50;
+        const ions = [];
+        const electrons = [];
+
+        function renderAllFormulas() {
+            katex.render('|V_{GS}| < |V_{TH}|', document.getElementById('corte-cond'));
+            katex.render('|I_D| = 0', document.getElementById('corte-eq'));
+            
+            katex.render('|V_{DS}| < |V_{GS}| - |V_{TH}|', document.getElementById('triodo-cond'));
+            // Fórmula do triodo com notação exata da imagem (6.70)
+            katex.render('|I_{D,tri}| = \\frac{1}{2} \\mu_p C_{ox} \\frac{W}{L} [2(|V_{GS}| - |V_{TH}|)|V_{DS}| - V_{DS}^2]', document.getElementById('triodo-eq'));
+
+            katex.render('|V_{DS}| \\geq |V_{GS}| - |V_{TH}|', document.getElementById('saturacao-cond'));
+            // Saturação com notação exata da imagem (6.69)
+            katex.render('|I_{D,sat}| = \\frac{1}{2} \\mu_p C_{ox} \\frac{W}{L} (|V_{GS}| - |V_{TH}|)^2 (1 + \\lambda |V_{DS}|)', document.getElementById('saturacao-eq'));
+
+            // Fórmulas para C_ox, r_o e R_on
+            katex.render('C_{ox} = \\frac{\\epsilon_{ox}}{t_{ox}}', document.getElementById('cox-formula'));
+            katex.render('r_o = \\left( \\frac{\\partial |I_D|}{\\partial |V_{DS}|} \\right)^{-1}', document.getElementById('ro-def-eq'));
+            katex.render('r_o \\approx \\frac{1}{\\lambda |I_D|}', document.getElementById('ro-approx-eq'));
+            katex.render('R_{on} = \\frac{1}{\\mu_p C_{ox} \\frac{W}{L}(|V_{GS}| - |V_{TH}|)}', document.getElementById('ron-eq'));
+        }
+
+        function createCharges() {
+            for (let i = 0; i < NUM_IONS; i++) {
+                const ion = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                ion.setAttribute('class', 'charge ion');
+                ion.textContent = '+'; // Íons positivos no substrato N
+                ion.style.opacity = '0';
+                fixedIonsGroup.appendChild(ion);
+                ions.push(ion);
+            }
+            for (let i = 0; i < NUM_ELECTRONS; i++) {
+                const electron = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                electron.setAttribute('class', 'charge electron');
+                electron.textContent = '–'; // Eletrões
+                electron.style.opacity = '0';
+                channelElectronsGroup.appendChild(electron);
+                electrons.push({
+                    element: electron,
+                    x: 0,
+                    y: 0,
+                    speed: Math.random() * 1.5 + 0.5
+                });
+            }
+        }
+
+        function initializeChart() {
+            const ctx = chartCanvas.getContext('2d');
+            ivChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    datasets: [{
+                        label: 'Curva |I_D|-|V_DS|', data: [], borderColor: 'rgb(244, 63, 94)', borderWidth: 3, tension: 0.1, pointRadius: 0,
+                    }, {
+                        label: 'Ponto de Operação', data: [], borderColor: 'rgb(59, 130, 246)', backgroundColor: 'rgb(59, 130, 246)', pointRadius: 6, pointHoverRadius: 8, type: 'scatter'
+                    }, {
+                        label: '|Vdsat|', data: [], borderColor: 'rgb(250, 204, 21)', borderWidth: 2, borderDash: [6, 6], pointRadius: 0, fill: false,
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    scales: {
+                        x: { type: 'linear', position: 'bottom', title: { display: true, text: '|V_DS| (V)', font: { size: 14 } }, min: 0, max: 5 },
+                        y: { title: { display: true, text: '|I_D| (µA)', font: { size: 14 } }, beginAtZero: true }
+                    },
+                    plugins: { 
+                        legend: { 
+                            display: true,
+                            labels: {
+                                filter: (legendItem) => legendItem.datasetIndex !== 1, 
+                                font: { size: 12 }
+                            }
+                        } 
+                    },
+                    interaction: { intersect: false, mode: 'index' },
+                }
+            });
+        }
+        
+        function updateVthMarker() {
+            const percent = (V_th / vgSlider.max) * 100;
+            vthMarker.style.left = `calc(${percent}% - 2px)`;
+        }
+
+        function updateChartData(Vg, Vd, current, kp_prime, W_L, lambda) {
+            const Vov = Vg - V_th;
+            const curveData = [];
+            const K_p = kp_prime * W_L;
+
+            if (Vov > 0) {
+                for (let vds_step = 0; vds_step <= 5; vds_step += 0.05) {
+                    let ids;
+                    if (vds_step < Vov) { 
+                        // Triodo: Aplicando o fator (1+lambda*vds) aqui também 
+                        // para garantir a continuidade matemática suave no gráfico
+                        ids = 0.5 * K_p * (2 * Vov * vds_step - vds_step * vds_step) * (1 + lambda * vds_step);
+                    } else { 
+                        // Saturação
+                        ids = 0.5 * K_p * Vov * Vov * (1 + lambda * vds_step);
+                    }
+                    curveData.push({x: vds_step, y: ids});
+                }
+            }
+            
+            ivChart.data.datasets[0].data = curveData;
+            ivChart.data.datasets[1].data = [{x: Vd, y: current}];
+            
+            const Vdsat = Math.max(0, Vov);
+            const saturationCurrentAtMaxVd = (Vov > 0) ? (0.5 * K_p * Vov * Vov) * (1 + lambda * 5) : 0;
+            const maxY = Math.max(saturationCurrentAtMaxVd * 1.2, 20);
+            ivChart.options.scales.y.max = maxY;
+
+            if (Vov > 0) {
+                ivChart.data.datasets[2].data = [{x: Vdsat, y: 0}, {x: Vdsat, y: maxY}];
+            } else {
+                ivChart.data.datasets[2].data = [];
+            }
+
+            ivChart.update('none');
+        }
+
+        function updateSimulation() {
+            const Vg = parseFloat(vgSlider.value);
+            const Vd = parseFloat(vdSlider.value);
+            const kp_prime = parseFloat(kpSlider.value);
+            const W = parseFloat(wSlider.value);
+            const L = parseFloat(lSlider.value);
+            const lambda_base = parseFloat(lambdaBaseSlider.value);
+            
+            const W_L = W / L;
+            const lambda = lambda_base / L;
+
+            vgValue.textContent = Vg === 0 ? "0.00 V" : `-${Vg.toFixed(2)} V`;
+            vdValue.textContent = Vd === 0 ? "0.00 V" : `-${Vd.toFixed(2)} V`;
+
+            kpValue.textContent = `${kp_prime.toFixed(0)} µA/V²`;
+            wValue.textContent = `${W.toFixed(1)}`;
+            lValue.textContent = `${L.toFixed(1)}`;
+            lambdaBaseValue.textContent = `${lambda_base.toFixed(2)}`;
+            lambdaValue.textContent = `${lambda.toFixed(3)} V⁻¹`;
+
+            let mode = '';
+            let current = 0;
+            const Vov = Vg - V_th;
+            const K_p = kp_prime * W_L;
+            
+            roContainer.classList.add('hidden');
+            ronContainer.classList.add('hidden');
+
+            if (Vov <= 0) {
+                mode = 'CORTE';
+                current = 0;
+                roValue.textContent = 'N/A';
+                ronValue.textContent = 'N/A';
+                roContainer.classList.remove('hidden');
+                updateVisuals(mode, Vg, 0, 0, L);
+            } else {
+                if (Vd < Vov) {
+                    mode = 'TRIODO';
+                    // Aplicando o fator (1 + lambda*Vd) para evitar o degrau/salto na curva
+                    current = 0.5 * K_p * (2 * Vov * Vd - Vd * Vd) * (1 + lambda * Vd);
+                    
+                    const ron_ohms = 1 / (kp_prime * 1e-6 * W_L * Vov);
+                    ronValue.textContent = `${(ron_ohms).toFixed(2)} Ω`;
+                    ronContainer.classList.remove('hidden');
+
+                    const pinchOffRatio = Vd / Vov;
+                    updateVisuals(mode, Vg, 1, pinchOffRatio, L, current);
+                } else {
+                    mode = 'SATURAÇÃO';
+                    current = 0.5 * K_p * Vov * Vov * (1 + lambda * Vd);
+                    
+                    let ro = 'N/A';
+                    if (lambda > 0 && current > 1e-3) {
+                        const ro_ohms = 1 / (lambda * (current / 1e6));
+                        ro = `${(ro_ohms / 1000).toFixed(2)} kΩ`;
+                    } else if (lambda === 0) {
+                        ro = '∞';
+                    }
+                    roValue.textContent = ro;
+                    roContainer.classList.remove('hidden');
+
+                    updateVisuals(mode, Vg, 1, 1, L, current);
+                }
+            }
+
+            modeText.textContent = mode;
+            currentText.textContent = `${current.toFixed(2)} µA`;
+            updateChartData(Vg, Vd, current, kp_prime, W_L, lambda);
+        }
+        
+        function updateVisuals(mode, Vg, channelStrength, pinchOffRatio, L, current = 0) {
+            const baseL_visual = 200; 
+            const minL_visual = 50;  
+            const maxL_visual = 300; 
+            const newL_visual = maxL_visual - (L - lSlider.min) / (lSlider.max - lSlider.min) * (maxL_visual - minL_visual);
+            const xOffset = (500 - newL_visual) / 2;
+
+            // Região Central
+            gateSvg.setAttribute('x', xOffset);
+            gateSvg.setAttribute('width', newL_visual);
+            oxideSvg.setAttribute('x', xOffset);
+            oxideSvg.setAttribute('width', newL_visual);
+            depletionRect.setAttribute('x', xOffset);
+            depletionRect.setAttribute('width', newL_visual);
+            
+            gateContactSvg.setAttribute('x', xOffset + newL_visual/2 - 25);
+            gateLineSvg.setAttribute('x1', xOffset + newL_visual/2);
+            gateLineSvg.setAttribute('x2', xOffset + newL_visual/2);
+            vgLabelSvg.setAttribute('x', xOffset + newL_visual/2);
+
+            // Regiões Laterais
+            const sourceWidth = xOffset;
+            const drainStartX = xOffset + newL_visual;
+            const drainWidth = 500 - drainStartX;
+
+            sourcePPlus.setAttribute('width', sourceWidth);
+            drainPPlus.setAttribute('x', drainStartX);
+            drainPPlus.setAttribute('width', drainWidth);
+
+            fieldOxideLeft.setAttribute('width', sourceWidth);
+            fieldOxideRight.setAttribute('x', drainStartX);
+            fieldOxideRight.setAttribute('width', drainWidth);
+
+            const sourceCenterX = sourceWidth / 2;
+            sourceMetalContact.setAttribute('x', sourceCenterX - 25);
+            sourceMetalLine.setAttribute('x1', sourceCenterX);
+            sourceMetalLine.setAttribute('x2', sourceCenterX);
+            sourceVdd.setAttribute('transform', `translate(${sourceCenterX - 75}, 0)`);
+            sourceTextLabel.setAttribute('x', sourceCenterX);
+            sourceTextLabel.querySelector('tspan').setAttribute('x', sourceCenterX);
+
+            const drainCenterX = drainStartX + (drainWidth / 2);
+            drainMetalContact.setAttribute('x', drainCenterX - 25);
+            drainMetalLine.setAttribute('x1', drainCenterX);
+            drainMetalLine.setAttribute('x2', drainCenterX);
+            vdLabel.setAttribute('x', drainCenterX + 25);
+            drainTextLabel.setAttribute('x', drainCenterX);
+            drainTextLabel.querySelector('tspan').setAttribute('x', drainCenterX);
+
+            // --- Atualização do Canal e Depleção ---
+            const maxDepletionHeight = 30;
+            const depletionHeight = Math.min(maxDepletionHeight, Vg * 15);
+            depletionRect.setAttribute('height', depletionHeight);
+
+            channelPoly.style.opacity = channelStrength;
+            const channelMaxHeight = 10; 
+            const sourceSideHeight = channelMaxHeight;
+            const drainSideHeight = channelMaxHeight * (1 - pinchOffRatio);
+            
+            // Desenho do Pinch-off
+            const points = `${xOffset},160 ${xOffset + newL_visual},160 ${xOffset + newL_visual},${160 + drainSideHeight} ${xOffset},${160 + sourceSideHeight}`;
+            channelPoly.setAttribute('points', points);
+
+            // --- Atualização das Cargas ---
+            ions.forEach((ion, i) => {
+                if (i < NUM_IONS * (depletionHeight / maxDepletionHeight) && Vg > 0.1) {
+                    const x = xOffset + 10 + Math.random() * (newL_visual - 20);
+                    const y = 170 + Math.random() * (depletionHeight - 10);
+                    ion.setAttribute('x', x);
+                    ion.setAttribute('y', y);
+                    ion.style.opacity = '1';
+                } else {
+                    ion.style.opacity = '0';
+                }
+            });
+
+            const Vov = Vg - V_th;
+            const electronDensity = Vov > 0 ? Math.min(1, Vov / 2.0) : 0;
+            electrons.forEach((e, i) => {
+                 if (i < NUM_ELECTRONS * electronDensity) {
+                    if (current === 0 || e.x === 0) {
+                        const y_pos = 162 + Math.random() * (sourceSideHeight - 4);
+                        const x_pos = xOffset + 5 + Math.random() * (newL_visual - 10);
+                        e.element.setAttribute('x', x_pos);
+                        e.element.setAttribute('y', y_pos);
+                        e.x = x_pos;
+                        e.y = y_pos;
+                    }
+                    e.element.style.opacity = '1';
+                } else {
+                    e.element.style.opacity = '0';
+                    e.x = 0; 
+                }
+            });
+            
+            // --- Animação da Corrente (Eletrões vão do Dreno para a Fonte, contra I_D) ---
+            cancelAnimationFrame(animationFrameId);
+            if (current > 0.1) {
+                conventionalCurrentArrow.style.opacity = '1';
+                const animateCurrent = () => {
+                    electrons.forEach(e => {
+                        if (e.element.style.opacity === '1') {
+                            e.x -= e.speed * (current / 50); // Direção negativa (Direita -> Esquerda)
+                            if (e.x < xOffset + 5) {
+                                e.x = xOffset + newL_visual - 5; // Retorna para o Dreno
+                            }
+                            e.element.setAttribute('x', e.x);
+                        }
+                    });
+                    animationFrameId = requestAnimationFrame(animateCurrent);
+                };
+                animateCurrent();
+            } else {
+                conventionalCurrentArrow.style.opacity = '0';
+            }
+
+            explanations.forEach(exp => exp.classList.remove('border-red-500', 'bg-red-50', 'shadow-md'));
+            formulas.forEach(form => form.classList.remove('active'));
+            pinchOffEffectSvg.classList.add('hidden');
+            pinchOffEffectSvg.classList.remove('pulsing-glow');
+
+            switch (mode) {
+                case 'CORTE':
+                    statusCard.className = 'p-6 rounded-xl shadow-lg text-white text-center transition-colors duration-300 mt-6 bg-slate-500';
+                    expCorte.classList.add('border-red-500', 'bg-red-50', 'shadow-md');
+                    formulaCorte.classList.add('active');
+                    break;
+                case 'TRIODO':
+                    statusCard.className = 'p-6 rounded-xl shadow-lg text-white text-center transition-colors duration-300 mt-6 bg-green-500';
+                    expTriodo.classList.add('border-red-500', 'bg-red-50', 'shadow-md');
+                    formulaTriodo.classList.add('active');
+                    break;
+                case 'SATURAÇÃO':
+                    statusCard.className = 'p-6 rounded-xl shadow-lg text-white text-center transition-colors duration-300 mt-6 bg-rose-600';
+                    expSaturacao.classList.add('border-red-500', 'bg-red-50', 'shadow-md');
+                    formulaSaturacao.classList.add('active');
+                    pinchOffEffectSvg.setAttribute('cx', xOffset + newL_visual);
+                    pinchOffEffectSvg.classList.remove('hidden');
+                    pinchOffEffectSvg.classList.add('pulsing-glow');
+                    break;
+            }
+        }
+
+        // --- Event Listeners ---
+        [vgSlider, vdSlider, kpSlider, wSlider, lSlider, lambdaBaseSlider].forEach(slider => {
+            slider.addEventListener('input', updateSimulation);
+        });
+        window.addEventListener('resize', updateVthMarker);
+
+        // --- Chamada Inicial ---
+        window.onload = () => {
+            renderAllFormulas();
+            createCharges();
+            initializeChart();
+            updateVthMarker();
+            updateSimulation();
+        };
+    </script>
+
+</body>
+</html>
