@@ -7,5 +7,5 @@ O sistema permite a visualização didática, em tempo real, do comportamento f�
 A aplicação combina modelagem matemática, atualização dinâmica de variáveis e representação gráfica simultânea, possibilitando ao usuário observar, de forma integrada, a relação entre as equações do dispositivo, sua resposta elétrica e sua interpretação física.
 
 
-## Interface Gráfica
+## Interface Gráfica (PMOS)
 <img width="1022" height="907" alt="capa" src="https://github.com/user-attachments/assets/27e4e049-578f-45d4-99ee-8aebed1fa667" />
