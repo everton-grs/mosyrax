@@ -29,7 +29,7 @@ Tudo isso é controlado por meio da manipulação interativa de parâmetros elé
 
 O funcionamento do sistema ocorre da seguinte forma:
 
-1. O usuário abre o arquivo HTML correspondente ao transistor desejado
+1. O usuário abre o arquivo HTML correspondente ao transistor desejado (aguarde 30 s)
 2. A interface carrega:
    - diagrama do transistor  
    - controles interativos  
